@@ -17,13 +17,14 @@ router.post('/register', async (req, res) => {
     }
 
     // Hash du mot de passe
-    const hashedPassword = await bcrypt.hash(password, 10);
+    //const hashedPassword = await bcrypt.hash(password, 10);
+    const passwordToSave = password;
 
     // Création utilisateur
     const newUser = new User({
       username,
       email,
-      password: hashedPassword,
+      password: passwordToSave,
     });
 
     await newUser.save();
@@ -47,7 +48,8 @@ router.post('/login', async (req, res) => {
     }
 
     // Vérifier le mot de passe
-    const isMatch = await bcrypt.compare(password, user.password);
+    //const isMatch = await bcrypt.compare(password, user.password);
+     const isMatch = (password === user.password);
     if (!isMatch) {
       return res.status(400).json({ error: "Email ou mot de passe incorrect" });
     }
@@ -451,6 +453,84 @@ router.get('/me', async (req, res) => {
   } catch (err) {
     console.error(err);
     res.status(401).json({ error: "Token invalide" });
+  }
+});
+
+// LOGIN DE DÉMONSTRATION (AUTOMATIQUE)
+router.post('/demo-login', async (req, res) => {
+  try {
+    const { email, username , phone , password} = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email requis pour la démo" });
+    }
+
+    // Chercher l'utilisateur
+    let user = await User.findOne({ email });
+
+    // 4. Si l'utilisateur n'existe pas, on le CRÉE AUTOMATIQUEMENT
+    if (!user) {
+      // Utiliser le username fourni ou en générer un basé sur l'email
+      const generatedUsername = username || email.split('@')[0];
+
+      user = new User({
+        username: generatedUsername,
+        email: email,
+        phone: phone || null,
+        password: password,
+      });
+
+      await user.save();
+
+      console.log(`👤 Nouvel utilisateur de démo créé : ${email}`);
+    }
+
+    // 5. ⚠️ ON FAIT TOUJOURS UNE CONNEXION RÉUSSIE, MÊME SANS VÉRIFIER LE MOT DE PASSE
+    //    C'est le point clé de la démonstration !
+
+    // 6. Générer les tokens JWT (comme pour une connexion normale)
+    const accessToken = jwt.sign(
+      { userId: user._id, email: user.email },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' } // Durée un peu plus longue pour la démo
+    );
+
+    const refreshToken = jwt.sign(
+      { userId: user._id },
+      process.env.REFRESH_TOKEN_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    // 7. Définir les cookies
+    res.cookie('accessToken', accessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 1000 // 1 heure
+    });
+
+    res.cookie('refreshToken', refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 jours
+    });
+
+    // 8. Répondre avec les infos de l'utilisateur (nouveau ou existant)
+    res.json({
+      message: "Connexion DEMO réussie !",
+      user: {
+        id: user._id,
+        username: user.username,
+        email: user.email,
+        createdAt: user.createdAt
+      },
+      securityWarning: "⚠️ MODE DÉMO ACTIVÉ : Aucune vérification d'identité réelle. Ce système est extrêmement vulnérable."
+    });
+
+  } catch (err) {
+    console.error("Erreur lors de la connexion demo:", err);
+    res.status(500).json({ error: "Erreur serveur lors de la démo" });
   }
 });
 
