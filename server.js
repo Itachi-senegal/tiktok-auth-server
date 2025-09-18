@@ -16,11 +16,14 @@ app.set('trust proxy', true);
 // Configuration CORS améliorée
 const allowedOrigins = [
   'http://localhost:3000',                           // Développement local
-  'https://tiktok-auth-client.vercel.app',          // Production Vercel
+  'https://tiktok-auth-client.vercel.app',          // Production Vercel principal
+  'https://tiktok-auth-client-*.vercel.app',        // Previews Vercel (optionnel)
   process.env.CLIENT_URL                            // Variable d'environnement
 ].filter(Boolean); // Retire les valeurs undefined
 
 console.log('🌍 Origins autorisées:', allowedOrigins);
+console.log('🔧 NODE_ENV:', process.env.NODE_ENV);
+console.log('🌐 CLIENT_URL:', process.env.CLIENT_URL);
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -32,8 +35,16 @@ app.use(cors({
       return callback(null, true);
     }
 
+    // Vérifier les origins exactes
     if (allowedOrigins.includes(origin)) {
       console.log('✅ Origin autorisée:', origin);
+      return callback(null, true);
+    }
+
+    // Vérifier les sous-domaines Vercel (pour les previews)
+    const isVercelPreview = origin && origin.includes('tiktok-auth-client') && origin.includes('vercel.app');
+    if (isVercelPreview) {
+      console.log('✅ Preview Vercel autorisée:', origin);
       return callback(null, true);
     }
 
@@ -45,6 +56,12 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }));
+
+// Middleware de debug CORS (temporaire)
+app.use((req, res, next) => {
+  console.log(`📥 ${req.method} ${req.path} - Origin: ${req.headers.origin || 'Non défini'}`);
+  next();
+});
 
 // Connexion MongoDB
 mongoose.connect(process.env.MONGO_URI, {
@@ -60,7 +77,10 @@ app.use('/auth', authRoutes);
 
 // Route de base
 app.get('/', (req, res) => {
-  res.json({ message: 'Backend TikTok Auth OK!' });
+  res.json({
+    message: 'Backend TikTok Auth OK!',
+    cors_origins: allowedOrigins
+  });
 });
 
 // Route test
@@ -68,7 +88,8 @@ app.get('/auth/test', (req, res) => {
   res.json({
     message: 'Backend opérationnel !',
     timestamp: new Date().toISOString(),
-    env: process.env.NODE_ENV
+    env: process.env.NODE_ENV,
+    allowed_origins: allowedOrigins
   });
 });
 
@@ -79,7 +100,8 @@ app.use((err, req, res, next) => {
     return res.status(403).json({
       error: 'CORS Error',
       message: err.message,
-      origin: req.headers.origin
+      origin: req.headers.origin,
+      allowed_origins: allowedOrigins
     });
   }
   next(err);
@@ -91,4 +113,5 @@ app.listen(PORT, () => {
   console.log(`🚀 Serveur backend sur ${process.env.NODE_ENV === 'production' ? process.env.SERVER_URL : `http://localhost:${PORT}`}`);
   console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV}`);
   console.log(`🔗 CLIENT_URL: ${process.env.CLIENT_URL}`);
+  console.log(`📋 CORS Origins: ${allowedOrigins.join(', ')}`);
 });
