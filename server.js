@@ -10,6 +10,9 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
+// Configuration pour Render (proxy inverse)
+app.set('trust proxy', true);
+
 // Configuration CORS améliorée
 const allowedOrigins = [
   'http://localhost:3000',                           // Développement local
@@ -54,6 +57,11 @@ mongoose.connect(process.env.MONGO_URI, {
 // Routes
 const authRoutes = require('./routes/auth');
 app.use('/auth', authRoutes);
+
+// Route de base
+app.get('/', (req, res) => {
+  res.json({ message: 'Backend TikTok Auth OK!' });
+});
 
 // Route test
 app.get('/auth/test', (req, res) => {
