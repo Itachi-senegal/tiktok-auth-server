@@ -1,4 +1,4 @@
-require('dotenv').config(); // Charger les variables d'environnement depuis .env
+require('dotenv').config(); // Charger .env
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,38 +8,44 @@ const app = express();
 
 // Middleware
 app.use(express.json());
+app.use(cookieParser());
 
-// CORS : accepter localhost pour dev et le front déployé sur Vercel
+// CORS - autoriser localhost et frontend déployé
 const allowedOrigins = [
-  'http://localhost:3000', // frontend local
-  'https://tiktok-auth-client.vercel.app' // frontend Vercel
+  process.env.CLIENT_URL, // Exemple: http://localhost:3000 ou https://tiktok-auth-client.vercel.app
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
-    // autoriser les requêtes sans origine (ex: Postman)
+    // Autoriser les requêtes sans origin (Postman, serveur, mobile)
     if (!origin) return callback(null, true);
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = `L'accès CORS pour ${origin} est refusé`;
-      return callback(new Error(msg), false);
+      return callback(new Error(`CORS: Origin non autorisé (${origin})`), false);
     }
     return callback(null, true);
   },
-  credentials: true, // pour envoyer les cookies
+  credentials: true, // Important pour les cookies
 }));
 
-app.use(cookieParser());
-
 // Connexion MongoDB
-const mongoUri = process.env.MONGO_URI || 'mongodb://localhost:27017/tiktok-auth';
-mongoose.connect(mongoUri)
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+})
   .then(() => console.log("✅ MongoDB connecté"))
-  .catch(err => console.error(err));
+  .catch(err => console.error("❌ Erreur MongoDB :", err));
 
 // Routes
 const authRoutes = require('./routes/auth');
 app.use('/auth', authRoutes);
 
+// Route test
+app.get('/auth/test', (req, res) => {
+  res.json({ message: 'Backend opérationnel !' });
+});
+
 // Lancer serveur
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`🚀 Serveur backend sur http://localhost:${PORT}`));
+app.listen(PORT, () => {
+  console.log(`🚀 Serveur backend sur ${process.env.NODE_ENV === 'production' ? process.env.SERVER_URL : `http://localhost:${PORT}`}`);
+});
