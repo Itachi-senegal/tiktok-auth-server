@@ -1,3 +1,4 @@
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -8,19 +9,23 @@ const app = express();
 // Middleware
 app.use(express.json());
 app.use(cors({
-  origin: 'http://localhost:3000',
+  origin: process.env.CLIENT_URL,
   credentials: true,
 }));
 app.use(cookieParser());
 
 // Connexion MongoDB
-mongoose.connect('mongodb://localhost:27017/tiktok-auth')
+mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB connecté"))
-  .catch(err => console.error(err));
+  .catch(err => console.error("❌ Erreur MongoDB:", err));
 
 // Routes
 const authRoutes = require('./routes/auth');
 app.use('/auth', authRoutes);
 
+// Route test
+app.get('/', (req, res) => res.send('Backend en ligne ✅'));
+
 // Lancer serveur
-app.listen(5000, () => console.log("🚀 Serveur backend sur http://localhost:5000"));
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => console.log(`🚀 Serveur backend sur http://localhost:${PORT}`));
